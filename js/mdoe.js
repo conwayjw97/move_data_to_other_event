@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function() {
         eventTitles[eventId] = eventTitle;
     });
 
-    $.each(eventColumns, function(i, eventColumn) { 
+    $.each(eventColumns, function(i, eventColumn) {
             // $element.appendTo(dialogButton); does not work, only appears on last element
             eDialogButton.clone().appendTo(eventColumn);
             });
@@ -34,7 +34,7 @@ document.addEventListener('DOMContentLoaded', function() {
             try {
             const im = link.firstChild.src;
             // TODO: endsWith(array)
-                if ( im.endsWith('circle_green.png') || im.endsWith('circle_yellow.png') || im.endsWith('circle_red.png') ) {
+                if (im.endsWith('circle_green_stack.png') || im.endsWith('circle_yellow_stack.png') || im.endsWith('circle_red_stack.png') || im.endsWith('circle_green.png') || im.endsWith('circle_yellow.png') || im.endsWith('circle_red.png') ) {
                     // $element.prependTo(link); does not work, only appears on last element
                     fDialogButton.clone().insertBefore(link);
                 }
@@ -61,14 +61,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     selectedFilledCells[cellNum] = im.firstChild.src;
                     if (!selectedFilledCells[cellNum].endsWith('circle_gray.png')) {
                         const params = new URLSearchParams(im.href);
-                        formNames.push( params.get('page') );
+                        // formNames.push( params.get('page') ); // You cannot move repeating instances of the event if it takes form names
                     }
                 }
             } catch(e) {
                 // ignore empty cells
                 // console.log(e);
             }
-            });
+          });
 
         let validEventIds = [];
         $.each(otherCols, function(cellNum, col) {
@@ -152,18 +152,38 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
+        let event_id = null;
+        let page = null;
+
+        // If this is a repeating instance form, open the instance table to get page name and event id
+        if(params.get('page')==null && params.get('event_id')==null){
+          $(this).next().click();
+          let checkExist = setInterval(function() {
+             if ($('#instancesTablePopup').length) {
+                clearInterval(checkExist);
+             }
+          }, 100); // check every 100ms
+          event_id = $('[id^="repeat_instrument_table"]')[0].id.split('-')[1];
+          page = $('[id^="repeat_instrument_table"]')[0].id.split('-')[2];
+        }
+        // Otherwise, get page name and event id as from button element
+        else{
+          event_id = params.get('event_id');
+          page = params.get('page');
+        }
+
         let dialogForm = $( "#dialog-mdoe" ).clone();
         $(dialogForm).attr('title', 'Moving Single Form Data');
         dialogForm.dialog({
           buttons: {
             "Migrate Form Data": function() {
                 const targetEventId = $(this).find('select').find(':selected').val();
-                ajaxMoveEvent(params.get('event_id'), targetEventId, [params.get('page')], true);
+                ajaxMoveEvent(event_id, targetEventId, [page], true);
                 // TODO: check that previous worked before deleting
             },
             "Clone Form Data": function() {
                 const targetEventId = $(this).find('select').find(':selected').val();
-                ajaxMoveEvent(params.get('event_id'), targetEventId, [params.get('page')], false);
+                ajaxMoveEvent(event_id, targetEventId, [page], false);
             }
           },
         });
