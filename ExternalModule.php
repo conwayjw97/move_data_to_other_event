@@ -106,86 +106,92 @@ class ExternalModule extends AbstractExternalModule
             $new_data[$record_id][$target_event_id] = $old_data[$record_id][$source_event_id];
         }
 
-        if ($delete_source_data) {
-            $response = REDCap::saveData($project_id, 'array', $new_data, 'normal'); // initial write to target
-            $log_message = "Migrated form(s) " . $form_names . " from event " . $source_event_id . " to " . $target_event_id;
+        $response = REDCap::saveData(
+            $project_id,
+            'array',
+            $new_data,
+            'normal',
+            'YMD',
+            'flat',
+            null,
+            true,
+            true,
+            true,
+            false,
+            true,
+            array(),
+            false,
+            false
+        ); // do not skip file upload fields, see the REDCap core code Classes/Records.php
 
-            // soft delete all data for each field
-            if (array_key_exists("repeat_instances", $old_data[$record_id])) {
-                array_walk_recursive(
-                    $old_data[$record_id]["repeat_instances"][$source_event_id],
-                    function (&$value, $key) use ($record_pk) {
-                        if ($key !== $record_pk) {
-                            $value = null;
-                        }
-                    }
-                );
-            } else {
-                array_walk_recursive(
-                    $old_data[$record_id][$source_event_id],
-                    function (&$value, $key) use ($record_pk) {
-                        if ($key !== $record_pk) {
-                            $value = null;
-                        }
-                    }
-                );
-            }
-            $delete_response = REDCap::saveData($project_id, 'array', $old_data, 'overwrite');
-
-            // previous step did not delete documents, force their migration
-            $log_message = $this->forceMigrateSourceFields($get_data, $project_id, $record_id, $source_event_id, $target_event_id, $log_message);
+        if (strcmp(explode(',', $response["errors"][0])[1], "\"redcap_repeat_instrument\"")==0) {
+            $log_message = "Failed to migrate forms, target form for " . explode(',', $response["errors"][0])[2] . " does not match source form repeating instruments setting";
         } else {
-            // Create copies of edocs for cloning
-            // necessary as if a cloned form containing an edoc is deleted, the file which all clones reference is also purged
-            if ($edocs_present) {
-                // Clone files and assign them to their respective fields in the cloned forms
-                foreach ($edocs_results as $edocs_result) {
-                    if (array_key_exists("repeat_instances", $new_data[$record_id])) {
-                        if (isset($new_data[$record_id]["repeat_instances"][$target_event_id][$edocs_result['field_name']])) {
-                            $path = Files::copyEdocToTemp($edocs_result['doc_id']); // clone the existing file to temp dir
-                            $file = [];
-                            $file['name'] = basename($edocs_result['doc_name']);
-                            $file['tmp_name'] = $path;
-                            $file['size'] = filesize($path);
+            if ($delete_source_data) {
+                $response = REDCap::saveData($project_id, 'array', $new_data, 'normal'); // initial write to target
+                $log_message = "Migrated form(s) " . $form_names . " from event " . $source_event_id . " to " . $target_event_id;
 
-                            $new_data[$record_id]["repeat_instances"][$target_event_id][$edocs_result['field_name']] =
-                            Files::uploadFile($file, $project_id);
+                // soft delete all data for each field
+                if (array_key_exists("repeat_instances", $old_data[$record_id])) {
+                    array_walk_recursive(
+                        $old_data[$record_id]["repeat_instances"][$source_event_id],
+                        function (&$value, $key) use ($record_pk) {
+                            if ($key !== $record_pk) {
+                                $value = null;
+                            }
                         }
-                    } else {
-                        if (isset($new_data[$record_id][$target_event_id][$edocs_result['field_name']])) {
-                            $path = Files::copyEdocToTemp($edocs_result['doc_id']); // clone the existing file to temp dir
-                            $file = [];
-                            $file['name'] = basename($edocs_result['doc_name']);
-                            $file['tmp_name'] = $path;
-                            $file['size'] = filesize($path);
+                    );
+                } else {
+                    array_walk_recursive(
+                        $old_data[$record_id][$source_event_id],
+                        function (&$value, $key) use ($record_pk) {
+                            if ($key !== $record_pk) {
+                                $value = null;
+                            }
+                        }
+                    );
+                }
+                $delete_response = REDCap::saveData($project_id, 'array', $old_data, 'overwrite');
 
-                            $new_data[$record_id][$target_event_id][$edocs_result['field_name']] =
-                            Files::uploadFile($file, $project_id);
+                // previous step did not delete documents, force their migration
+                $log_message = $this->forceMigrateSourceFields($get_data, $project_id, $record_id, $source_event_id, $target_event_id, $log_message);
+            } else {
+                // Create copies of edocs for cloning
+                // necessary as if a cloned form containing an edoc is deleted, the file which all clones reference is also purged
+                if ($edocs_present) {
+                    // Clone files and assign them to their respective fields in the cloned forms
+                    foreach ($edocs_results as $edocs_result) {
+                        if (array_key_exists("repeat_instances", $new_data[$record_id])) {
+                            if (isset($new_data[$record_id]["repeat_instances"][$target_event_id][$edocs_result['field_name']])) {
+                                $path = Files::copyEdocToTemp($edocs_result['doc_id']); // clone the existing file to temp dir
+                                $file = [];
+                                $file['name'] = basename($edocs_result['doc_name']);
+                                $file['tmp_name'] = $path;
+                                $file['size'] = filesize($path);
+
+                                $new_data[$record_id]["repeat_instances"][$target_event_id][$edocs_result['field_name']] =
+                              Files::uploadFile($file, $project_id);
+                            }
+                        } else {
+                            if (isset($new_data[$record_id][$target_event_id][$edocs_result['field_name']])) {
+                                $path = Files::copyEdocToTemp($edocs_result['doc_id']); // clone the existing file to temp dir
+                                $file = [];
+                                $file['name'] = basename($edocs_result['doc_name']);
+                                $file['tmp_name'] = $path;
+                                $file['size'] = filesize($path);
+
+                                $new_data[$record_id][$target_event_id][$edocs_result['field_name']] =
+                              Files::uploadFile($file, $project_id);
+                            }
                         }
                     }
                 }
+
+                $log_message = "Cloned form(s) " . $form_names . " from event " . $source_event_id . " to " . $target_event_id;
             }
-            $response = REDCap::saveData(
-                $project_id,
-                'array',
-                $new_data,
-                'normal',
-                'YMD',
-                'flat',
-                null,
-                true,
-                true,
-                true,
-                false,
-                true,
-                array(),
-                false,
-                false
-            ); // do not skip file upload fields, see the REDCap core code Classes/Records.php
-            $log_message = "Cloned form(s) " . $form_names . " from event " . $source_event_id . " to " . $target_event_id;
         }
 
-        REDCap::logEvent("Moved data from an event to a different event", $log_message);
+        REDCap::logEvent("Event move result", $log_message);
 
         // TODO: parse response, use as flag for deletion
         return json_encode($delete_response);
