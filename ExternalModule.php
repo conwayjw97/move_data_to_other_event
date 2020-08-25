@@ -40,6 +40,8 @@ class ExternalModule extends AbstractExternalModule
 
     public function moveEvent($source_event_id, $target_event_id, $record_id = null, $project_id = null, $form_names = null, $delete_source_data = true)
     {
+        file_put_contents("debug_trace.txt", "");
+
         $record_id = $record_id ?: (($this->framework->getRecordId()) ?: null); // return in place of NULL causes errors
         $project_id = $project_id ?: (($this->framework->getProjectId()) ?: null);
         $record_pk = REDCap::getRecordIdField();
@@ -67,6 +69,7 @@ class ExternalModule extends AbstractExternalModule
             'fields' => $fields,
             'events' => $source_event_id
         ];
+        file_put_contents("debug_trace.txt", print_r($get_data, true) . "\n", FILE_APPEND);
 
         $field_list = ($fields) ? " AND d.field_name IN ('" . implode('\',\'', $fields) . "');" : ";";
         $edocs_sql = "SELECT d.field_name, em.doc_id, em.stored_name, em.doc_name
@@ -98,6 +101,8 @@ class ExternalModule extends AbstractExternalModule
         // get record for selected event, swap source_event_id for target_event_id
         $old_data = REDCap::getData($get_data);
 
+        file_put_contents("debug_trace.txt", print_r($old_data, true) . "\n", FILE_APPEND);
+
         // If this is a repeating instrument variable the move needs to account for a different data structure
         if (array_key_exists("repeat_instances", $old_data[$record_id])) {
             $new_data[$record_id][$target_event_id] = $old_data[$record_id][$source_event_id];
@@ -105,6 +110,8 @@ class ExternalModule extends AbstractExternalModule
         } else {
             $new_data[$record_id][$target_event_id] = $old_data[$record_id][$source_event_id];
         }
+
+        file_put_contents("debug_trace.txt", print_r($new_data, true) . "\n", FILE_APPEND);
 
         $response = REDCap::saveData(
             $project_id,
@@ -123,6 +130,8 @@ class ExternalModule extends AbstractExternalModule
             false,
             false
         ); // do not skip file upload fields, see the REDCap core code Classes/Records.php
+
+        file_put_contents("debug_trace.txt", print_r($response, true) . "\n", FILE_APPEND);
 
         if (strcmp(explode(',', $response["errors"][0])[1], "\"redcap_repeat_instrument\"")==0) {
             $log_message = "Failed to migrate forms, target form for " . explode(',', $response["errors"][0])[2] . " does not match source form repeating instruments setting";
