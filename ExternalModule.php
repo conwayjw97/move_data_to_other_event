@@ -135,6 +135,8 @@ class ExternalModule extends AbstractExternalModule
 
         if (strcmp(explode(',', $response["errors"][0])[1], "\"redcap_repeat_instrument\"")==0) {
             $log_message = "Failed to migrate forms, target form for " . explode(',', $response["errors"][0])[2] . " does not match source form repeating instruments setting";
+        } elseif ($response["errors"][0]!=null) {
+            $log_message = "Failed to migrate forms, miscellaneous error: " . $response["errors"][0];
         } else {
             if ($delete_source_data) {
                 $response = REDCap::saveData($project_id, 'array', $new_data, 'normal'); // initial write to target
